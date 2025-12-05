@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Repo Graph Visualizer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+  <div id="header">
+    <h1>Repo Graph Visualizer</h1>
+    <p>Вставь публичный GitHub репозиторий (например: https://github.com/owner/repo-name)</p>
+    <div id="controls">
+      <input id="repoInput" type="text" placeholder="https://github.com/owner/repo-name" />
+      <button id="analyzeBtn">Анализировать</button>
+      <span id="status"></span>
+    </div>
+  </div>
+
+  <div id="canvasWrap">
+    <svg id="svgCanvas"></svg>
+  </div>
+
+  <div id="legend">
+    <strong>Легенда:</strong>
+    <span class="legend-item"><span class="dot class"></span>Class</span>
+    <span class="legend-item"><span class="dot function"></span>Function</span>
+    <span class="legend-item"><span class="dot method"></span>Method</span>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

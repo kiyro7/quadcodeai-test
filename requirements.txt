@@ -1,3 +1,7 @@
-fastapi>=0.95
-uvicorn[standard]>=0.22
-python-dateutil
+fastapi==0.99.0
+uvicorn[standard]==0.22.0
+pydantic==1.10.12
+aiofiles==23.1.0
+python-multipart==0.0.6
+gitpython==3.1.36
+networkx==3.4

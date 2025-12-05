@@ -1,18 +1,13 @@
-# Code Graph Visualizer (FastAPI)
+# Repo-Graph-Visualizer
 
-## Что делает
-Клонирует публичный GitHub репозиторий (.git) и статически анализирует файлы `.py`. Строит граф определений (классы/функции) и использований между ними. Отображает интерактивную SVG-визуализацию с подсветкой соседей.
+FastAPI приложение для визуализации использования классов и функций в git-репозитории.
 
 ## Запуск
 
-### Docker (рекомендуется)
-- `docker build -t code-graph-fastapi .`
-- `docker run -p 8000:8000 code-graph-fastapi`
+Собрать образ (в каталоге с `Dockerfile`):
 
-### Локально
-- `python -m venv .venv`
-- `source .venv/bin/activate`
-- `pip install -r requirements.txt`
-- `uvicorn main:app --reload`
+`docker build -t repo-graph-visualizer .`
+`docker run -p 8000:8000 repo-graph-visualizer`
 
-## Открыть http://localhost:8000/
+
+Открой `http://localhost:8000` и вставь ссылку на публичный GitHub-репозиторий.
