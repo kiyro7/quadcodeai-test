@@ -6,6 +6,7 @@ from pathlib import Path
 # Структуры: nodes: list of dict {id, label, type, file}
 # edges: list of dict {source, target, label?}
 
+
 class Definition:
     def __init__(self, fqname: str, short: str, typ: str, file: str, lineno: int):
         self.fqname = fqname  # module.path:Name or module.path.Class.method
@@ -14,12 +15,14 @@ class Definition:
         self.file = file
         self.lineno = lineno
 
+
 def iter_py_files(root: str):
     for p in Path(root).rglob("*.py"):
         # пропускаем виртуальные окружения и .git
         if "/.venv/" in str(p) or "/venv/" in str(p) or "/.git/" in str(p):
             continue
         yield p
+
 
 class RepoAnalyzer:
     def __init__(self, repo_root: str):

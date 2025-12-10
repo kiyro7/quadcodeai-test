@@ -68,3 +68,35 @@ body{
   pointer-events:none;
   box-shadow:0 8px 30px rgba(0,0,0,0.6);
 }
+
+#svgCanvas{
+  width:100%;
+  height:calc(100vh - 160px);
+  display:block;
+  filter: drop-shadow(0 10px 30px rgba(0,0,0,0.6));
+  cursor: grab;
+}
+#svgCanvas:active{
+  cursor: grabbing;
+}
+
+#svgCanvas{
+  width:100%;
+  height:calc(100vh - 160px);
+  display:block;
+  filter: drop-shadow(0 10px 30px rgba(0,0,0,0.6));
+  cursor: grab;
+}
+#svgCanvas:active{
+  cursor: grabbing;
+}
+
+.dot.class{
+  background:#a48bff;
+}
+.dot.function{
+  background:#00d4ff;
+}
+.dot.method{
+  background:#ff9f6b;
+}

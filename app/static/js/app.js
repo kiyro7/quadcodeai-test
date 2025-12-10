@@ -111,47 +111,18 @@ function normalizeGraph(data){
 function renderGraph(g){
   svg.selectAll("*").remove();
 
-  // re-add defs
+  // ===== defs (glow, gradient, arrow) =====
   const defs = svg.append("defs");
   defs.append("filter").attr("id","glow")
     .append("feGaussianBlur").attr("stdDeviation","2");
+
   defs.append("linearGradient").attr("id","gradNode")
     .selectAll("stop")
     .data([{offset:"0%", color:"#7b61ff"},{offset:"100%",color:"#00f0ff"}])
     .enter().append("stop")
-    .attr("offset", d=>d.offset).attr("stop-color", d=>d.color);
+    .attr("offset", d=>d.offset)
+    .attr("stop-color", d=>d.color);
 
-  const linkG = svg.append("g").attr("class","links");
-  const nodeG = svg.append("g").attr("class","nodes");
-
-  // компактные точки
-  const sizeScale = d3.scaleOrdinal()
-    .domain(["class","function","method"])
-    .range([7,5,4]); // маленькие радиусы
-
-  simulation = d3.forceSimulation(g.nodes)
-    .force("link", d3.forceLink(g.edges).id(d=>d.id).distance(80).strength(0.7))
-    .force("charge", d3.forceManyBody().strength(-140))
-    .force("center", d3.forceCenter(width/2, height/2))
-    .force("collision", d3.forceCollide().radius(d => sizeScale(d.type) + 5))
-    .on("tick", ticked);
-
-  // links
-  const link = linkG.selectAll("line")
-    .data(g.edges)
-    .enter().append("line")
-    .attr("stroke-width", 1.1)
-    .attr("stroke-opacity", 0.35)
-    .attr("stroke", "#9fb3ff")
-    .attr("class","edge")
-    .on("mouseover", (event,d) => {
-      highlightEdge(d, true);
-    })
-    .on("mouseout", (event,d) => {
-      highlightEdge(d, false);
-    });
-
-  // стрелки: немного отодвигаем, чтобы они были видны перед маленькими точками
   defs.append("marker")
     .attr("id", "arrow")
     .attr("viewBox", "0 -5 10 10")
@@ -165,18 +136,82 @@ function renderGraph(g){
     .attr("fill", "#9fb3ff")
     .attr("opacity", 0.7);
 
-  link.attr("marker-end","url(#arrow)");
+  // ===== слой, который будем зумить и таскать =====
+  const zoomLayer = svg.append("g").attr("class", "zoom-layer");
 
-  // nodes: маленькие аккуратные круги
+  const linkG = zoomLayer.append("g").attr("class","links");
+  const nodeG = zoomLayer.append("g").attr("class","nodes");
+
+  // ======== ЗУМ + ПАНОРАМА ========
+  // Alt + колесо -> зум, ЛКМ по пустому -> панорамирование
+  const zoom = d3.zoom()
+    .scaleExtent([0.2, 3]) // минимальный / максимальный масштаб
+    .filter(event => {
+      // Зум: только Alt + колесо мыши
+      if (event.type === "wheel") {
+        return event.altKey;
+      }
+      // Остальное — как дефолтный фильтр d3.zoom:
+      // ЛКМ без модификаторов -> панорамирование
+      return (!event.ctrlKey && !event.button && !event.altKey && !event.metaKey && !event.shiftKey)
+             || event.type === "touchstart";
+    })
+    .on("zoom", (event) => {
+      zoomLayer.attr("transform", event.transform);
+    });
+
+  svg
+    .call(zoom)
+    .on("dblclick.zoom", null); // убираем зум по двойному клику (чтобы не мешал)
+
+  // ======== СИМУЛЯЦИЯ ========
+    // компактные точки
+  const sizeScale = d3.scaleOrdinal()
+    .domain(["class","function","method"])
+    .range([8, 6, 5]); // немного разные, но все маленькие аккуратные
+
+  const colorScale = d3.scaleOrdinal()
+    .domain(["class","function","method"])
+    .range([
+      "#a48bff", // class
+      "#00d4ff", // function
+      "#ff9f6b"  // method
+    ]);
+
+
+  simulation = d3.forceSimulation(g.nodes)
+    .force("link", d3.forceLink(g.edges).id(d=>d.id).distance(80).strength(0.7))
+    .force("charge", d3.forceManyBody().strength(-140))
+    .force("center", d3.forceCenter(width/2, height/2))
+    .force("collision", d3.forceCollide().radius(d => sizeScale(d.type) + 5))
+    .on("tick", ticked);
+
+  // ======== РЁБРА ========
+  const link = linkG.selectAll("line")
+    .data(g.edges)
+    .enter().append("line")
+    .attr("stroke-width", 1.1)
+    .attr("stroke-opacity", 0.35)
+    .attr("stroke", "#9fb3ff")
+    .attr("class","edge")
+    .attr("marker-end","url(#arrow)")
+    .on("mouseover", (event,d) => {
+      highlightEdge(d, true);
+    })
+    .on("mouseout", (event,d) => {
+      highlightEdge(d, false);
+    });
+
+  // ======== УЗЛЫ ========
   const node = nodeG.selectAll("g")
     .data(g.nodes)
     .enter().append("g")
     .attr("class","node")
-    .call(drag(simulation));
+    .call(drag(simulation));  // перетаскивание отдельных узлов (как было)
 
-  node.append("circle")
-    .attr("r", d => sizeScale(d.type))
-    .attr("fill", "url(#gradNode)")
+    node.append("circle")
+    .attr("r", d => sizeScale(d.type) || 6)          // на всякий случай дефолт
+    .attr("fill", d => colorScale(d.type) || "#ccc") // цвет по типу
     .attr("stroke", "rgba(255,255,255,0.6)")
     .attr("stroke-width", 0.8)
     .style("filter", "url(#glow)")
@@ -189,18 +224,20 @@ function renderGraph(g){
       hideTooltip();
     });
 
-  // подписи чуть дальше от точки, чтобы не мешать стрелкам
   node.append("text")
     .text(d => d.label)
     .attr("x", 0)
-    .attr("y", - (sizeScale.range()[0] + 10)) // всегда немного выше
+    .attr("y", -(sizeScale.range()[0] + 10))
     .attr("text-anchor", "middle")
     .attr("font-size", 10)
     .attr("fill", "#eaf2ff")
     .attr("pointer-events", "none");
 
-  // tooltip
-  const tooltip = d3.select("body").append("div").attr("class","tooltip").style("display","none");
+  // ===== tooltip =====
+  const tooltip = d3.select("body")
+    .append("div")
+    .attr("class","tooltip")
+    .style("display","none");
 
   function showTooltip(event, d){
     tooltip.style("display","block")

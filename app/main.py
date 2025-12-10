@@ -24,8 +24,10 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
 app.mount("/templates", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "templates")), name="templates")
 
+
 class RepoRequest(BaseModel):
     repo_url: str
+
 
 @app.post("/analyze")
 async def analyze_repo(req: RepoRequest):
@@ -55,6 +57,7 @@ async def analyze_repo(req: RepoRequest):
             shutil.rmtree(tmpdir)
         except Exception:
             pass
+
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
