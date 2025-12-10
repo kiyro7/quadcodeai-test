@@ -4,24 +4,56 @@ const width = +svg.node().getBoundingClientRect().width;
 const height = +svg.node().getBoundingClientRect().height;
 
 let simulation;
-let linkGroup, nodeGroup, labelGroup;
 let graph = {nodes: [], edges: []};
 
 const status = document.getElementById("status");
 const repoInput = document.getElementById("repoInput");
-document.getElementById("analyzeBtn").addEventListener("click", analyzeRepo);
+const analyzeBtn = document.getElementById("analyzeBtn");
+analyzeBtn.addEventListener("click", analyzeRepo);
+
+// ====== спиннер (крутилка) ======
+const spinnerStyle = document.createElement("style");
+spinnerStyle.textContent = `
+.spinner{
+  margin-left:8px;
+  width:16px;height:16px;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,0.2);
+  border-top-color:#7b61ff;
+  animation:spin 0.7s linear infinite;
+  display:inline-block;
+}
+@keyframes spin{
+  to{ transform:rotate(360deg); }
+}`;
+document.head.appendChild(spinnerStyle);
+
+const spinnerEl = document.createElement("span");
+spinnerEl.className = "spinner";
+spinnerEl.style.display = "none";
+status.after(spinnerEl);
+
+function setLoading(isLoading) {
+  if (isLoading) {
+    analyzeBtn.disabled = true;
+    spinnerEl.style.display = "inline-block";
+  } else {
+    analyzeBtn.disabled = false;
+    spinnerEl.style.display = "none";
+  }
+}
 
 function setStatus(txt) {
   status.textContent = txt;
 }
 
-// initial defs for glow
+// initial defs for glow (используем небольшое свечение)
 const defs = svg.append("defs");
-const glow = defs.append("filter")
+defs.append("filter")
   .attr("id","glow")
   .append("feGaussianBlur")
-  .attr("stdDeviation", "6")
-;
+  .attr("stdDeviation", "2");
+
 defs.append("linearGradient").attr("id","gradNode")
   .selectAll("stop")
   .data([{offset:"0%", color:"#7b61ff"},{offset:"100%",color:"#00f0ff"}])
@@ -35,29 +67,34 @@ function analyzeRepo(){
     setStatus("Введите ссылку на GitHub.");
     return;
   }
-  setStatus("Клонирование и анализ репозитория... (подождите)");
+  setLoading(true);
+  setStatus("Клонирование и анализ репозитория...");
+
   fetch("/analyze", {
     method:"POST",
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({repo_url: url})
-  }).then(r=>r.json()).then(data=>{
-    if(!data.ok){
-      setStatus("Ошибка: " + (data.detail || "unknown"));
-      return;
-    }
-    graph = normalizeGraph(data.data);
-    setStatus(`Узлов: ${graph.nodes.length}, рёбер: ${graph.edges.length}`);
-    renderGraph(graph);
-  }).catch(err=>{
-    console.error(err);
-    setStatus("Ошибка запроса: " + err.message);
-  });
+  })
+    .then(r=>r.json())
+    .then(data=>{
+      if(!data.ok){
+        setStatus("Ошибка: " + (data.detail || "unknown"));
+        return;
+      }
+      graph = normalizeGraph(data.data);
+      setStatus(`Узлов: ${graph.nodes.length}, рёбер: ${graph.edges.length}`);
+      renderGraph(graph);
+    })
+    .catch(err=>{
+      console.error(err);
+      setStatus("Ошибка запроса: " + err.message);
+    })
+    .finally(()=>{
+      setLoading(false);
+    });
 }
 
 function normalizeGraph(data){
-  // data.nodes: {id,fqname,label,type,file,lineno}
-  // data.edges: {source,target}
-  // convert to arrays suitable for d3
   const nodes = data.nodes.map(n => ({
     id: n.id,
     label: n.label,
@@ -68,7 +105,6 @@ function normalizeGraph(data){
     source: e.source,
     target: e.target
   }));
-  // optionally prune isolated nodes? keep all
   return {nodes, edges};
 }
 
@@ -78,7 +114,7 @@ function renderGraph(g){
   // re-add defs
   const defs = svg.append("defs");
   defs.append("filter").attr("id","glow")
-    .append("feGaussianBlur").attr("stdDeviation","6");
+    .append("feGaussianBlur").attr("stdDeviation","2");
   defs.append("linearGradient").attr("id","gradNode")
     .selectAll("stop")
     .data([{offset:"0%", color:"#7b61ff"},{offset:"100%",color:"#00f0ff"}])
@@ -87,27 +123,26 @@ function renderGraph(g){
 
   const linkG = svg.append("g").attr("class","links");
   const nodeG = svg.append("g").attr("class","nodes");
-  const labelG = svg.append("g").attr("class","labels");
 
-  // scales
+  // компактные точки
   const sizeScale = d3.scaleOrdinal()
     .domain(["class","function","method"])
-    .range([16,12,10]);
+    .range([7,5,4]); // маленькие радиусы
 
-  // create simulation
   simulation = d3.forceSimulation(g.nodes)
     .force("link", d3.forceLink(g.edges).id(d=>d.id).distance(80).strength(0.7))
     .force("charge", d3.forceManyBody().strength(-140))
     .force("center", d3.forceCenter(width/2, height/2))
-    .force("collision", d3.forceCollide().radius(d => sizeScale(d.type) + 8))
+    .force("collision", d3.forceCollide().radius(d => sizeScale(d.type) + 5))
     .on("tick", ticked);
 
   // links
   const link = linkG.selectAll("line")
     .data(g.edges)
     .enter().append("line")
-    .attr("stroke-width", 1.2)
+    .attr("stroke-width", 1.1)
     .attr("stroke-opacity", 0.35)
+    .attr("stroke", "#9fb3ff")
     .attr("class","edge")
     .on("mouseover", (event,d) => {
       highlightEdge(d, true);
@@ -116,14 +151,14 @@ function renderGraph(g){
       highlightEdge(d, false);
     });
 
-  // directional arrow
+  // стрелки: немного отодвигаем, чтобы они были видны перед маленькими точками
   defs.append("marker")
     .attr("id", "arrow")
     .attr("viewBox", "0 -5 10 10")
-    .attr("refX", 18)
+    .attr("refX", 14)
     .attr("refY", 0)
-    .attr("markerWidth", 8)
-    .attr("markerHeight", 8)
+    .attr("markerWidth", 7)
+    .attr("markerHeight", 7)
     .attr("orient", "auto")
     .append("path")
     .attr("d", "M0,-5L10,0L0,5")
@@ -132,7 +167,7 @@ function renderGraph(g){
 
   link.attr("marker-end","url(#arrow)");
 
-  // nodes
+  // nodes: маленькие аккуратные круги
   const node = nodeG.selectAll("g")
     .data(g.nodes)
     .enter().append("g")
@@ -140,10 +175,10 @@ function renderGraph(g){
     .call(drag(simulation));
 
   node.append("circle")
-    .attr("r", d => sizeScale(d.type) + 6)
-    .attr("fill", d => "url(#gradNode)")
-    .attr("stroke", "rgba(255,255,255,0.08)")
-    .attr("stroke-width", 1)
+    .attr("r", d => sizeScale(d.type))
+    .attr("fill", "url(#gradNode)")
+    .attr("stroke", "rgba(255,255,255,0.6)")
+    .attr("stroke-width", 0.8)
     .style("filter", "url(#glow)")
     .on("mouseover", (event, d) => {
       highlightNode(d, true);
@@ -154,12 +189,13 @@ function renderGraph(g){
       hideTooltip();
     });
 
+  // подписи чуть дальше от точки, чтобы не мешать стрелкам
   node.append("text")
     .text(d => d.label)
     .attr("x", 0)
-    .attr("y", d => - (sizeScale(d.type) + 10))
+    .attr("y", - (sizeScale.range()[0] + 10)) // всегда немного выше
     .attr("text-anchor", "middle")
-    .attr("font-size", 11)
+    .attr("font-size", 10)
     .attr("fill", "#eaf2ff")
     .attr("pointer-events", "none");
 
@@ -176,16 +212,23 @@ function renderGraph(g){
     tooltip.style("display","none");
   }
 
-  // neighbor map for highlighting
   const neighborMap = buildNeighborMap(g);
 
   function highlightNode(d, on){
     if(on){
-      // highlight d and its neighbors
       node.selectAll("circle").style("opacity", n => (n.id === d.id || neighborMap[d.id].has(n.id)) ? 1 : 0.12);
       node.selectAll("text").style("opacity", n => (n.id === d.id || neighborMap[d.id].has(n.id)) ? 1 : 0.12);
-      link.style("opacity", l => (l.source.id === d.id || l.target.id === d.id) ? 1 : 0.06)
-          .style("stroke", l => (l.source.id === d.id || l.target.id === d.id) ? "#a8d1ff" : "#9fb3ff");
+      link
+        .style("opacity", l => {
+          const srcId = typeof l.source === "object" ? l.source.id : l.source;
+          const tgtId = typeof l.target === "object" ? l.target.id : l.target;
+          return (srcId === d.id || tgtId === d.id) ? 1 : 0.06;
+        })
+        .style("stroke", l => {
+          const srcId = typeof l.source === "object" ? l.source.id : l.source;
+          const tgtId = typeof l.target === "object" ? l.target.id : l.target;
+          return (srcId === d.id || tgtId === d.id) ? "#a8d1ff" : "#9fb3ff";
+        });
     } else {
       node.selectAll("circle").style("opacity", 1);
       node.selectAll("text").style("opacity", 1);
@@ -194,9 +237,9 @@ function renderGraph(g){
   }
 
   function highlightEdge(edge, on){
+    const srcId = typeof edge.source === "object" ? edge.source.id : edge.source;
+    const tgtId = typeof edge.target === "object" ? edge.target.id : edge.target;
     if(on){
-      const srcId = typeof edge.source === "object" ? edge.source.id : edge.source;
-      const tgtId = typeof edge.target === "object" ? edge.target.id : edge.target;
       node.selectAll("circle").style("opacity", n => (n.id === srcId || n.id === tgtId) ? 1 : 0.12);
       node.selectAll("text").style("opacity", n => (n.id === srcId || n.id === tgtId) ? 1 : 0.12);
       link.style("opacity", l => (l === edge) ? 1 : 0.06);
@@ -222,7 +265,6 @@ function buildNeighborMap(g){
   g.nodes.forEach(n => map[n.id] = new Set());
 
   g.edges.forEach(e => {
-    // если D3 уже заменил строки на объекты — берем их id
     const src = typeof e.source === "object" ? e.source.id : e.source;
     const tgt = typeof e.target === "object" ? e.target.id : e.target;
 
@@ -232,7 +274,6 @@ function buildNeighborMap(g){
 
   return map;
 }
-
 
 function drag(sim){
   function dragstarted(event){
@@ -254,6 +295,3 @@ function drag(sim){
     .on("drag", dragged)
     .on("end", dragended);
 }
-
-// автозаполнение примера
-repoInput.value = "https://github.com/psf/requests";
