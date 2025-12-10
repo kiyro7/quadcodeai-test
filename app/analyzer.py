@@ -29,7 +29,7 @@ class RepoAnalyzer:
         self.root = repo_root
         self.defs: Dict[str, Definition] = {}  # key fqname -> Definition
         self.by_short: Dict[str, Set[str]] = {}  # short name -> set of fqnames
-        self.edges: Set[Tuple[str,str]] = set()
+        self.edges: Set[Tuple[str, str]] = set()
 
     def analyze(self):
         # первый проход: собрать определения
@@ -173,7 +173,8 @@ class RepoAnalyzer:
             # ctx is tuple returned above
             kind = ctx[0]
             if kind == "method":
-                cls_name = ctx[1]; func_name = ctx[2]
+                cls_name = ctx[1]
+                func_name = ctx[2]
                 # try to resolve to a fqname
                 # prefer module.Class.func
                 candidate = f"{module_name}.{cls_name}.{func_name}"
